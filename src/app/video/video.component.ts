@@ -1,5 +1,8 @@
-import { Component, ElementRef, ViewChild, OnInit } from '@angular/core';
+import { Component, ElementRef, ViewChild, OnInit, OnDestroy } from '@angular/core';
 import type * as Hls from 'hls.js';
+import { Subscription } from "rxjs";
+import { HlsLoaderService } from "./hls-loader/hls-loader.service";
+import { VideoService } from "./hls-loader/video-service.model";
 
 @Component({
   template: `<div>
@@ -19,30 +22,28 @@ import type * as Hls from 'hls.js';
   }
   button { margin-top: 12px;}`]
 })
-export class VideoComponent implements OnInit {
+export class VideoComponent implements OnDestroy {
 
   readonly src = 'assets/geoff.mp4';
 
-  private hls: Hls | undefined;
-  private HLS: typeof Hls | undefined;
-
   @ViewChild('video', { static: true }) private readonly video: ElementRef<HTMLVideoElement>;
 
-  async ngOnInit(): Promise<void> {
-    import('hls.js');
-    import('hls.js');
-    const HLS = await import('hls.js') as unknown as { default: () => void, isSupported: () => boolean };
-    console.log('hls loaded');
-    if (!HLS.isSupported()) {
-      return;
-    }
-    this.hls = new HLS.default();
-    this.HLS = HLS as unknown as typeof Hls;
+  private hls: Hls | undefined;
+  private events: any | undefined;
+  private subscription$$: Subscription;
+
+  constructor(videoService: VideoService) {
+    this.subscription$$ = videoService.get$().subscribe(hls => this.hls = hls);
+    this.subscription$$.add(videoService.getEvents$().subscribe(events => this.events = events));
+  }
+
+  ngOnDestroy(): void {
+    this.subscription$$.unsubscribe();
   }
 
   loadVideo(): void {
     this.hls.attachMedia(this.video.nativeElement);
-    this.hls.on(this.HLS.Events.MEDIA_ATTACHED, () => {
+    this.hls.on(this.events.MEDIA_ATTACHED, () => {
       this.hls.loadSource(this.src);
       this.video.nativeElement.setAttribute('src', this.src);
       this.video.nativeElement.play();
